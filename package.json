@@ -35,7 +35,7 @@
   ],
   "scripts": {
     "build": "node build.js",
-    "package:vsix": "npm run build && npx @vscode/vsce package --no-dependencies",
+    "package:vsix": "npm run build && npx @vscode/vsce package --no-dependencies --allow-missing-repository",
     "install:extension": "bash scripts/install-extension.sh",
     "open:custom-screen": "bash scripts/open-custom-screen.sh",
     "start:extension": "bash scripts/start-extension.sh",
