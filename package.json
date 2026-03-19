@@ -1,0 +1,31 @@
+{
+  "name": "custom-screen-extension",
+  "displayName": "Custom Screen Extension",
+  "description": "A basic VS Code extension that opens a focused Custom Screen webview on startup.",
+  "version": "0.0.1",
+  "publisher": "local-dev",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:customScreen.show"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "customScreen.show",
+        "title": "Show Custom Screen"
+      }
+    ]
+  },
+  "scripts": {
+    "start:extension": "bash scripts/start-extension.sh",
+    "test:devcontainer": "npx -y @devcontainers/cli up --workspace-folder ."
+  },
+  "license": "MIT"
+}

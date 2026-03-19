@@ -1,0 +1,12 @@
+{
+  "name": "custom-screen-extension-devcontainer",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": []
+    }
+  },
+  "postCreateCommand": "bash scripts/start-extension.sh"
+}
