@@ -2,8 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const vscode = require('vscode');
 
+const FLAG_RELATIVE_PATH = ['.vscode', 'open-custom-screen'];
+const FLAG_GLOB = `**/${FLAG_RELATIVE_PATH.join('/')}`;
+
 let panel;
-let startupScreenOpened = false;
 
 function getLogFile(context) {
   const logDir = path.join(context.extensionPath, '.tmp', 'logs');
@@ -65,10 +67,47 @@ function renderHtml() {
     <body>
       <main>
         <h1>Custom Screen</h1>
-        <p>Your start screen extension is installed, activated on startup, and running in the VS Code UI extension host.</p>
+        <p>Your start screen extension detected the devcontainer marker file and opened this webview in the VS Code UI extension host.</p>
       </main>
     </body>
   </html>`;
+}
+
+function getWorkspaceFolder() {
+  return vscode.workspace.workspaceFolders?.[0];
+}
+
+function getFlagUri() {
+  const folder = getWorkspaceFolder();
+  if (!folder) {
+    return undefined;
+  }
+
+  return vscode.Uri.joinPath(folder.uri, ...FLAG_RELATIVE_PATH);
+}
+
+async function consumeStartupFlag(context) {
+  const flagUri = getFlagUri();
+  if (!flagUri) {
+    log(context, 'startup-flag-skipped-no-workspace');
+    return false;
+  }
+
+  try {
+    await vscode.workspace.fs.stat(flagUri);
+  } catch {
+    return false;
+  }
+
+  try {
+    await vscode.workspace.fs.delete(flagUri, { useTrash: false });
+    log(context, `startup-flag-consumed ${flagUri.fsPath}`);
+  } catch (error) {
+    const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    log(context, `startup-flag-delete-failed ${message}`);
+  }
+
+  return true;
 }
 
 function showCustomScreen(context) {
@@ -103,51 +142,36 @@ function showCustomScreen(context) {
   return panel;
 }
 
-async function waitForWindowFocus(context) {
-  if (vscode.window.state.focused) {
+async function maybeOpenFromStartupFlag(context) {
+  const consumed = await consumeStartupFlag(context);
+  if (!consumed) {
     return;
   }
 
-  log(context, 'waiting-for-window-focus');
-
-  await new Promise(resolve => {
-    const timeout = setTimeout(() => {
-      disposable.dispose();
-      log(context, 'window-focus-timeout');
-      resolve();
-    }, 2000);
-
-    const disposable = vscode.window.onDidChangeWindowState(state => {
-      if (state.focused) {
-        clearTimeout(timeout);
-        disposable.dispose();
-        resolve();
-      }
-    });
-  });
-}
-
-async function openStartupScreen(context) {
-  if (startupScreenOpened) {
-    log(context, 'startup-screen-already-opened');
-    return;
-  }
-
-  startupScreenOpened = true;
-  await waitForWindowFocus(context);
   showCustomScreen(context);
 }
 
 function activate(context) {
   log(context, 'extension-activated');
 
+  const watcher = vscode.workspace.createFileSystemWatcher(FLAG_GLOB);
+
   context.subscriptions.push(
-    vscode.commands.registerCommand('customScreen.show', () => showCustomScreen(context))
+    vscode.commands.registerCommand('customScreen.show', () => showCustomScreen(context)),
+    watcher,
+    watcher.onDidCreate(() => {
+      log(context, 'startup-flag-created');
+      void maybeOpenFromStartupFlag(context);
+    }),
+    watcher.onDidChange(() => {
+      log(context, 'startup-flag-changed');
+      void maybeOpenFromStartupFlag(context);
+    })
   );
 
-  void openStartupScreen(context).catch(error => {
+  void maybeOpenFromStartupFlag(context).catch(error => {
     const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-    log(context, `startup-screen-error ${message}`);
+    log(context, `startup-flag-check-error ${message}`);
   });
 }
 

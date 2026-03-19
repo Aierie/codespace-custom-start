@@ -8,5 +8,5 @@
       "extensions": []
     }
   },
-  "postCreateCommand": "bash scripts/start-extension.sh"
+  "postCreateCommand": "bash .devcontainer/post-create.sh"
 }
