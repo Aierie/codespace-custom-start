@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+FLAG_DIR="$ROOT_DIR/.vscode"
+FLAG_FILE="$FLAG_DIR/open-custom-screen"
+
+mkdir -p "$FLAG_DIR"
+touch "$FLAG_FILE"
+
+echo "Created marker file: $FLAG_FILE"
+echo "If the extension is installed in this VS Code window, the webview should open shortly."

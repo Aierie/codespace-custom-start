@@ -11,13 +11,13 @@
     "Other"
   ],
   "extensionKind": [
-    "ui"
+    "workspace"
   ],
   "activationEvents": [
     "onStartupFinished",
     "onCommand:customScreen.show"
   ],
-  "main": "./extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
@@ -26,10 +26,24 @@
       }
     ]
   },
+  "files": [
+    "dist/**",
+    "media/**",
+    "README.md",
+    "LICENSE*",
+    "package.json"
+  ],
   "scripts": {
+    "build": "node build.js",
+    "package:vsix": "npm run build && npx @vscode/vsce package --no-dependencies",
     "install:extension": "bash scripts/install-extension.sh",
+    "open:custom-screen": "bash scripts/open-custom-screen.sh",
     "start:extension": "bash scripts/start-extension.sh",
     "test:devcontainer": "npx -y @devcontainers/cli up --workspace-folder ."
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.25.1"
   },
   "license": "MIT"
 }

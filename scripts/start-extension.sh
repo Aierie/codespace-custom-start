@@ -5,26 +5,28 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="$ROOT_DIR/.tmp"
 LOG_DIR="$TMP_DIR/logs"
 CODE_LOG="$LOG_DIR/code.log"
-EXT_LOG="$LOG_DIR/extension.log"
+PACKAGE_LOG="$LOG_DIR/package.log"
+INSTALL_LOG="$LOG_DIR/install.log"
 DISPLAY_NUM="${DISPLAY_NUM:-:99}"
-CODE_BIN="${CODE_BIN:-$(command -v code || true)}"
+CLI_BIN="${CODE_BIN:-$($ROOT_DIR/scripts/ensure-vscode.sh)}"
+GUI_BIN="${CLI_BIN%/bin/code}/code"
 EXTENSION_ID="$(node -p "const pkg = require('$ROOT_DIR/package.json'); pkg.publisher + '.' + pkg.name")"
 EXTENSION_VERSION="$(node -p "require('$ROOT_DIR/package.json').version")"
+PACKAGE_NAME="$(node -p "require('$ROOT_DIR/package.json').name")"
+VSIX_PATH="$ROOT_DIR/$PACKAGE_NAME-$EXTENSION_VERSION.vsix"
+EXT_INSTALL_DIR="$TMP_DIR/code-extensions/$EXTENSION_ID-$EXTENSION_VERSION"
+EXT_LOG="$EXT_INSTALL_DIR/.tmp/logs/extension.log"
+FLAG_FILE="$ROOT_DIR/.vscode/open-custom-screen"
 
-if [[ -z "$CODE_BIN" ]]; then
-  cat >&2 <<'MSG'
-Unable to find the VS Code CLI (`code`) in PATH.
-Install VS Code or set CODE_BIN to the full path of the CLI, then rerun this script.
-MSG
-  exit 1
-fi
+mkdir -p "$TMP_DIR/code-user-data" "$TMP_DIR/code-extensions" "$LOG_DIR" "$(dirname "$FLAG_FILE")"
+rm -f "$CODE_LOG" "$PACKAGE_LOG" "$INSTALL_LOG" "$EXT_LOG"
+touch "$FLAG_FILE"
 
-mkdir -p "$TMP_DIR/code-user-data" "$TMP_DIR/code-extensions" "$LOG_DIR"
-rm -f "$CODE_LOG" "$EXT_LOG"
+bash "$ROOT_DIR/scripts/install-extension.sh" "$TMP_DIR/code-extensions" "$VSIX_PATH"
 
-bash "$ROOT_DIR/scripts/install-extension.sh" "$TMP_DIR/code-extensions" >"$LOG_DIR/install.log"
-
-if ! "$CODE_BIN" \
+if ! env -u VSCODE_IPC_HOOK_CLI -u VSCODE_GIT_IPC_HANDLE \
+  "$CLI_BIN" \
+  --user-data-dir "$TMP_DIR/code-user-data" \
   --extensions-dir "$TMP_DIR/code-extensions" \
   --list-extensions \
   --show-versions >"$LOG_DIR/extensions.txt" 2>&1; then
@@ -58,7 +60,8 @@ XVFB_PID=$!
 export DISPLAY="$DISPLAY_NUM"
 sleep 2
 
-"$CODE_BIN" \
+env -u VSCODE_IPC_HOOK_CLI -u VSCODE_GIT_IPC_HANDLE \
+  "$GUI_BIN" \
   --no-sandbox \
   --disable-gpu \
   --new-window \
@@ -71,8 +74,8 @@ sleep 2
 CODE_PID=$!
 
 SUCCESS=0
-for _ in $(seq 1 60); do
-  if [[ -f "$EXT_LOG" ]] && grep -q 'custom-screen-visible' "$EXT_LOG"; then
+for _ in $(seq 1 90); do
+  if [[ -f "$EXT_LOG" ]] && grep -q 'webview-ready' "$EXT_LOG"; then
     SUCCESS=1
     break
   fi
@@ -85,9 +88,11 @@ for _ in $(seq 1 60); do
 done
 
 if [[ "$SUCCESS" -ne 1 ]]; then
-  echo 'VS Code extension did not report a visible Custom Screen webview.' >&2
+  echo 'VS Code extension did not report a ready Custom Screen webview.' >&2
+  echo '--- package log ---' >&2
+  cat "$PACKAGE_LOG" >&2 || true
   echo '--- install log ---' >&2
-  cat "$LOG_DIR/install.log" >&2 || true
+  cat "$INSTALL_LOG" >&2 || true
   echo '--- extension listing ---' >&2
   cat "$LOG_DIR/extensions.txt" >&2 || true
   echo '--- code log ---' >&2
@@ -97,4 +102,4 @@ if [[ "$SUCCESS" -ne 1 ]]; then
   exit 1
 fi
 
-echo "Custom Screen webview opened successfully from $EXTENSION_ID@$EXTENSION_VERSION."
+echo "Custom Screen webview opened successfully from $EXTENSION_ID@$EXTENSION_VERSION using $VSIX_PATH."
